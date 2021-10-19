@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Application.Models;
+using Microsoft.AspNetCore.Http;
 
 namespace Application.Controllers
 {
@@ -13,6 +14,8 @@ namespace Application.Controllers
     {
         public IActionResult Index()
         {
+            var culture = Request.HttpContext.Session.GetString("culture");
+            ViewBag.Language = culture;
             return View();
         }
 
@@ -25,6 +28,11 @@ namespace Application.Controllers
         public IActionResult Error()
         {
             return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
+        }
+        public IActionResult SetCulture(string culture)
+        {
+            Request.HttpContext.Session.SetString("culture", culture);
+            return RedirectToAction("Index");
         }
     }
 }

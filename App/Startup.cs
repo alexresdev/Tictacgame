@@ -13,18 +13,38 @@ using Microsoft.Extensions.Hosting;
 using Application.Services;
 using Application.Extensions;
 using Application.Models;
+using System.Globalization;
+using Microsoft.AspNetCore.Localization;
+using Microsoft.AspNetCore.Mvc.Razor;
+using Application.Options;
 
 namespace Application
 {
     public class Startup
     {
+        public IConfiguration Configuration { get; }
+        public Startup(IConfiguration configuration)
+        {
+            Configuration = configuration;
+        }
         public void ConfigureServices(IServiceCollection services)
         {
+            services.AddLocalization(options => options.ResourcesPath = "Localization");
+
+
             services.AddControllersWithViews();
             services.AddRazorPages();
-            //services.AddDirectoryBrowser();
+            services.Configure<EmailServiceOptions>(Configuration.GetSection("Email"));
             services.AddSingleton<IUserService, UserService>();
+            services.AddSingleton<IEmailService, EmailService>();
+            services.AddSingleton<IGameInvitationService, GameInvitationService>();
             services.AddRouting();
+            services.AddSession(o =>
+            {
+                o.IdleTimeout = TimeSpan.FromMinutes(30);
+            });
+            services.AddMvc().AddViewLocalization(LanguageViewLocationExpanderFormat.Suffix,
+                options => options.ResourcesPath = "Localization").AddDataAnnotationsLocalization();
         }
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)  // IHostingEnvironment is obsolete
         {
@@ -38,6 +58,7 @@ namespace Application
             }
 
             app.UseStaticFiles();
+            app.UseSession();
 
             var routeBuilder = new RouteBuilder(app);
             routeBuilder.MapGet("CreateUser", context =>
@@ -58,7 +79,19 @@ namespace Application
                 return context.Response.WriteAsync($"User {firstName} {lastName} has been successfully created.");
             });
 
+            app.UseWebSockets();
             app.UseCommunicationMiddleware();
+            var supportedCultures = CultureInfo.GetCultures(CultureTypes.AllCultures);
+            var localizationOptions = new RequestLocalizationOptions
+            {
+                DefaultRequestCulture = new RequestCulture("en-US"),
+                SupportedCultures = supportedCultures,
+                SupportedUICultures = supportedCultures
+            };
+            localizationOptions.RequestCultureProviders.Clear();
+            localizationOptions.RequestCultureProviders.Add(new CultureProviderResolverService());
+
+            app.UseRequestLocalization(localizationOptions);
 
             app.UseRouting();
 
