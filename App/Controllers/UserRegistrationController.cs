@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc.Routing;
 using Application.Services;
 using Application.Models;
+using Microsoft.Extensions.Logging;
 
 namespace Application.Controllers
 {
@@ -13,11 +14,14 @@ namespace Application.Controllers
     {
         private readonly IUserService _userService;
         private readonly IEmailService _emailService;
+        readonly ILogger<UserRegistrationController> _logger;
 
-        public UserRegistrationController(IUserService userService, IEmailService emailService)
+        public UserRegistrationController(IUserService userService, IEmailService emailService,
+            ILogger<UserRegistrationController> logger)
         {
             _userService = userService;
             _emailService = emailService;
+            _logger = logger;
         }
         public IActionResult Index()
         {
@@ -41,6 +45,7 @@ namespace Application.Controllers
         [HttpGet]
         public async Task<IActionResult> EmailConfirmation(string email)
         {
+            _logger.LogInformation($"##Start## Email confirmation process for {email}");
             var user = await _userService.GetUserByEmail(email);
             var urlAction = new UrlActionContext
             {
@@ -63,7 +68,7 @@ namespace Application.Controllers
             }
 
             if (user?.IsEmailConfirmed == true)
-                return RedirectToAction("Index", "GameInvitation", new { email = email });
+                return RedirectToAction("Index", "GameInvitation", new {email = email});
             ViewBag.Email = email;
             return View();
         }

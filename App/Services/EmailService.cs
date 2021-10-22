@@ -1,4 +1,5 @@
 ﻿using Application.Options;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
@@ -12,19 +13,31 @@ namespace Application.Services
     public class EmailService : IEmailService
     {
         private EmailServiceOptions _emailServiceOptions;
-        public EmailService(IOptions<EmailServiceOptions> emailServiceOptions)
+        readonly ILogger<EmailService> _logger;
+        public EmailService(IOptions<EmailServiceOptions> emailServiceOptions, ILogger<EmailService> logger)
         {
             _emailServiceOptions = emailServiceOptions.Value;
+            _logger = logger;
         }
 
         public Task SendEmail(string emailTo, string subject, string message)
         {
-            using (var client = new SmtpClient(_emailServiceOptions.MailServer, int.Parse(_emailServiceOptions.MailPort)))
+            try
             {
-                if (bool.Parse(_emailServiceOptions.UseSSL) == true) client.EnableSsl = true;
-                if (!string.IsNullOrEmpty(_emailServiceOptions.UserId))
-                    client.Credentials = new NetworkCredential(_emailServiceOptions.UserId, _emailServiceOptions.Password);
-                client.Send(new MailMessage("example@example.com", emailTo, subject, message));
+                _logger.LogInformation($"##Start sendEmail## Start sending Email to {emailTo}");
+                using (var client = new SmtpClient(_emailServiceOptions.MailServer,
+                    int.Parse(_emailServiceOptions.MailPort)))
+                {
+                    if (bool.Parse(_emailServiceOptions.UseSSL) == true)
+                        client.EnableSsl = true;
+                    if (!string.IsNullOrEmpty(_emailServiceOptions.UserId))
+                        client.Credentials = new NetworkCredential(_emailServiceOptions.UserId, _emailServiceOptions.Password);
+                    client.Send(new MailMessage ("alexresdev@gmail.com", emailTo, subject, message));
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Cannot send email {ex} ");
             }
             return Task.CompletedTask;
         }

@@ -22,17 +22,24 @@ namespace Application
 {
     public class Startup
     {
-        public IConfiguration Configuration { get; }
         public Startup(IConfiguration configuration)
         {
             Configuration = configuration;
         }
+        public IConfiguration Configuration { get; }
+
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddLocalization(options => options.ResourcesPath = "Localization");
-
+            services.Configure<CookiePolicyOptions>(options =>
+            {
+                // This lambda determines whether user consent for non-essential cookies 
+                // is needed for a given request.
+                options.CheckConsentNeeded = context => true;
+            });
 
             services.AddControllersWithViews();
+
             services.AddRazorPages();
             services.Configure<EmailServiceOptions>(Configuration.GetSection("Email"));
             services.AddSingleton<IUserService, UserService>();
@@ -43,9 +50,11 @@ namespace Application
             {
                 o.IdleTimeout = TimeSpan.FromMinutes(30);
             });
-            services.AddMvc().AddViewLocalization(LanguageViewLocationExpanderFormat.Suffix,
+            services.AddMvc().AddViewLocalization(LanguageViewLocationExpanderFormat.Suffix, 
                 options => options.ResourcesPath = "Localization").AddDataAnnotationsLocalization();
         }
+
+        // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)  // IHostingEnvironment is obsolete
         {
             if (env.IsDevelopment())
@@ -61,14 +70,14 @@ namespace Application
             app.UseSession();
 
             var routeBuilder = new RouteBuilder(app);
+
             routeBuilder.MapGet("CreateUser", context =>
             {
                 var firstName = context.Request.Query["firstName"];
                 var lastName = context.Request.Query["lastName"];
                 var email = context.Request.Query["email"];
                 var password = context.Request.Query["password"];
-                var userService = context.RequestServices.
-                GetService<IUserService>();
+                var userService = context.RequestServices.GetService<IUserService>();
                 userService.RegisterUser(new UserModel
                 {
                     FirstName = firstName,
@@ -79,8 +88,16 @@ namespace Application
                 return context.Response.WriteAsync($"User {firstName} {lastName} has been successfully created.");
             });
 
+            var newUserRoutes = routeBuilder.Build();
+            app.UseRouter(newUserRoutes);
+
+            app.UseCookiePolicy();
+            app.UseRouting();
+            app.UseAuthorization();
+
             app.UseWebSockets();
             app.UseCommunicationMiddleware();
+
             var supportedCultures = CultureInfo.GetCultures(CultureTypes.AllCultures);
             var localizationOptions = new RequestLocalizationOptions
             {
@@ -88,14 +105,12 @@ namespace Application
                 SupportedCultures = supportedCultures,
                 SupportedUICultures = supportedCultures
             };
+
+
             localizationOptions.RequestCultureProviders.Clear();
             localizationOptions.RequestCultureProviders.Add(new CultureProviderResolverService());
 
             app.UseRequestLocalization(localizationOptions);
-
-            app.UseRouting();
-
-            app.UseAuthorization();
 
             app.UseEndpoints(endpoints =>
             {
@@ -103,7 +118,6 @@ namespace Application
                     name: "default",
                     pattern: "{controller=Home}/{action=Index}/{id?}");
                 endpoints.MapRazorPages();
-                endpoints.MapControllers();
             });
 
 
